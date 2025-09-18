@@ -1,0 +1,75 @@
+plugins {
+    id "com.android.application"
+    id "kotlin-android"
+    // لازم يجي بعد Android/Kotlin
+    id "dev.flutter.flutter-gradle-plugin"
+}
+
+android {
+    namespace = "com.varplayerios.var_player_ios"
+
+    // القيم التالية يزودها Flutter من gradle.properties/.flutter-plugins
+    compileSdk = flutter.compileSdkVersion
+    ndkVersion = flutter.ndkVersion
+
+    // Java 17 مطلوب مع Android Gradle Plugin الحديث + Flutter جديد
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = "17"
+        // (اختياري) يحل مشاكل Default methods لبعض المكتبات
+        freeCompilerArgs += ["-Xjvm-default=all"]
+    }
+
+    defaultConfig {
+        applicationId = "com.varplayerios.var_player_ios"
+
+        // تستخدم القيم الافتراضية من Flutter (تقدر تثبت أرقامك هنا لو تريد)
+        minSdk = flutter.minSdkVersion    // عادة 21 أو أعلى
+        targetSdk = flutter.targetSdkVersion
+        versionCode = flutter.versionCode
+        versionName = flutter.versionName
+
+        // (اختياري) لو تستخدم Vector drawables قديمة
+        vectorDrawables {
+            useSupportLibrary = true
+        }
+    }
+
+    buildTypes {
+        debug {
+            // أسرع أثناء التطوير
+            minifyEnabled false
+            shrinkResources false
+        }
+        release {
+            // فعّل التصغير لتقليل الحجم (تقدر توقفه مؤقتًا لو سبب مشاكل)
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles(
+                    getDefaultProguardFile('proguard-android-optimize.txt'),
+                    'proguard-rules.pro'
+            )
+
+            // موقّتًا استخدم debug keystore. بدّلها بتوقيعك قبل الرفع على المتجر.
+            signingConfig signingConfigs.debug
+        }
+    }
+
+    // (اختياري) حل تعارضات موارد لبعض المكتبات
+    packagingOptions {
+        resources {
+            excludes += [
+                    "META-INF/AL2.0",
+                    "META-INF/LGPL2.1",
+            ]
+        }
+    }
+}
+
+flutter {
+    source = "../.."
+}

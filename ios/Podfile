@@ -1,0 +1,54 @@
+# ios/Podfile
+
+platform :ios, '12.0'
+ENV['COCOAPODS_DISABLE_STATS'] = 'true'
+
+project 'Runner', {
+  'Debug' => :debug,
+  'Profile' => :release,
+  'Release' => :release,
+}
+
+def flutter_root
+  generated_xcode_build_settings_path = File.expand_path(File.join('..', 'Flutter', 'Generated.xcconfig'), __FILE__)
+  unless File.exist?(generated_xcode_build_settings_path)
+    raise "#{generated_xcode_build_settings_path} must exist. Run `flutter pub get` first."
+  end
+  File.foreach(generated_xcode_build_settings_path) do |line|
+    matches = line.match(/FLUTTER_ROOT\=(.*)/)
+    return matches[1].strip if matches
+  end
+  raise "FLUTTER_ROOT not found in: #{generated_xcode_build_settings_path}"
+end
+
+require File.expand_path(File.join(flutter_root, 'packages', 'flutter_tools', 'bin', 'podhelper'), __FILE__)
+
+# إعدادات Flutter الافتراضية للبودات
+flutter_ios_podfile_setup
+
+target 'Runner' do
+  # أغلب إضافات Flutter الحديثة تحتاج هالسطور:
+  use_frameworks!
+  use_modular_headers!
+
+  flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
+
+  # إذا أضفت لاحقًا حزم فيها subspecs (مثل permissions)، تكتبها هنا.
+  # مثال:
+  # pod 'Permission-PhotoLibrary', :path => '../.ios/Pods/PermissionHandler/PhotoLibrary'
+end
+
+# تعديلات بعد تثبيت البودات
+post_install do |installer|
+  installer.pods_project.targets.each do |target|
+    target.build_configurations.each do |config|
+      # نثبّت الـ iOS Deployment Target لتفادي تحذيرات
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '12.0'
+      # ملاحظة: لا نغيّر EXCLUDED_ARCHS إلا إذا واجهت مشكلة محاكي M1.
+      # للبناء للأجهزة/الأرشفة على Codemagic ما تحتاجها غالبًا.
+    end
+  end
+
+  # إعداد إضافي خاص بـ Flutter
+  flutter_post_install(installer)
+end
