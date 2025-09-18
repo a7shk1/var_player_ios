@@ -1,0 +1,80 @@
+workflows:
+  ios_adhoc:
+    name: iOS Ad-hoc (IPA for Sideloadly)
+    max_build_duration: 60
+    instance_type: mac_mini_m1
+
+    environment:
+      xcode: 15.4
+      cocoapods: default
+      flutter: stable
+
+      # عدل هالقيم إذا تحتاج
+      vars:
+        BUNDLE_ID: com.varplayerios.varPlayerIos
+        IOS_SCHEME: Runner
+        IOS_WORKSPACE: ios/Runner.xcworkspace
+        IOS_EXPORT_METHOD: ad-hoc   # أو development إذا تريد IPA موقّع تطوير
+
+      # كلمة مرور الشهادة (ملف .p12) — حطها كـ Environment Variable مشفّرة من UI
+      # Settings > Environment variables > Add > Name: CERT_PASSWORD
+      secure:
+        CERT_PASSWORD: Encrypted(put_your_encrypted_value_here)
+
+    # اربط ملفات التوقيع اللي ترفعها من UI > Code signing
+    # ارفعهم بنفس الأسماء هنا:
+    code_signing:
+      certificates:
+        - ios_distribution.p12
+      provisioning_profiles:
+        - Runner_AdHoc.mobileprovision
+
+    cache:
+      cache_paths:
+        - ~/.pub-cache
+        - ios/Pods
+        - ~/Library/Caches/CocoaPods
+
+    scripts:
+      - name: Flutter clean & pub get
+        script: |
+          flutter clean
+          flutter pub get
+
+      - name: Ensure iOS pods
+        script: |
+          cd ios
+          pod install --repo-update
+          cd ..
+
+      # نبني flutter ios بدون توقيع، التوقيع راح يصير بخطوة Xcode
+      - name: Flutter build ios (no codesign)
+        script: |
+          flutter build ios --release --no-codesign
+
+      # نستخدم ملفات التوقيع اللي ربطناها
+      - name: Use provisioning profiles
+        script: |
+          xcode-project use-profiles
+
+      # نبني IPA عن طريق Xcode
+      - name: Build IPA with Xcode
+        script: |
+          xcode-project build-ipa \
+            --workspace "$IOS_WORKSPACE" \
+            --scheme "$IOS_SCHEME" \
+            --archive-path "$CM_BUILD_DIR/build/ios_archive.xcarchive" \
+            --export-method "$IOS_EXPORT_METHOD"
+
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - build/ios/ipa/*.dSYM.zip
+      - build/ios/archive/*.xcarchive
+
+    publishing:
+      email:
+        recipients:
+          - your@email.com
+        notify:
+          success: true
+          failure: true
