@@ -1,48 +1,26 @@
 workflows:
-  ios_ipa_min:
-    name: iOS IPA (Sideloadly)
-    instance_type: mac_mini_m1
+  ios-release-player:
+    name: iOS Release Build - Player
     max_build_duration: 60
+    instance_type: mac_mini_m2
 
     environment:
       flutter: stable
-      xcode: 15.4
-      cocoapods: default
-
-    # اربط ملفات التوقيع من UI > Code signing بهذين الاسمين
-    code_signing:
-      certificates:
-        - ios_cert.p12
-      provisioning_profiles:
-        - Runner.mobileprovision
+      xcode: latest
 
     scripts:
-      - name: Get packages
-        script: |
-          flutter pub get
+      - name: Get Flutter packages
+        script: flutter pub get
 
-      - name: Install CocoaPods
-        script: |
-          cd ios
-          pod install --repo-update
-          cd ..
-
-      - name: Flutter build (no codesign)
-        script: |
-          flutter build ios --release --no-codesign
-
-      - name: Apply signing profiles
-        script: |
-          xcode-project use-profiles
-
-      - name: Build IPA
-        script: |
-          # اختر طريقة التصدير: development أو ad-hoc
-          xcode-project build-ipa \
-            --workspace ios/Runner.xcworkspace \
-            --scheme Runner \
-            --archive-path "$CM_BUILD_DIR/build/ios_archive.xcarchive" \
-            --export-method development
+      - name: Build iOS IPA
+        script: flutter build ipa --release --no-codesign
 
     artifacts:
       - build/ios/ipa/*.ipa
+      - build/ios/ipa/*.app
+      - build/ios/archive/*.xcarchive
+
+    publishing:
+      email:
+        recipients:
+          - ahmed.289ahmed@gmail.com
