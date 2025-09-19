@@ -1,6 +1,6 @@
 # ios/Podfile
 
-platform :ios, '12.0'
+platform :ios, '13.0'
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
 
 project 'Runner', {
@@ -40,17 +40,13 @@ end
 
 # تعديلات بعد تثبيت البودات
 post_install do |installer|
-  # إذا كانت الدالة الحديثة متوفرة، استخدمها
-  if defined?(flutter_post_install)
-    flutter_post_install(installer)
-  else
-    # fallback للنهج القديم (مشاريع Flutter الأقدم)
-    installer.pods_project.targets.each do |target|
-      flutter_additional_ios_build_settings(target)
-      target.build_configurations.each do |config|
-        # تثبيت الـ Deployment Target لتقليل التحذيرات
-        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '12.0'
-      end
+  # أولاً: إصلاحات Flutter الرسمية (Xcode 15/16…)
+  flutter_post_install(installer) if defined?(flutter_post_install)
+
+  # ثانياً: تثبيت Target = iOS 13.0 على كل البودات لتفادي تعارض النسخ
+  installer.pods_project.targets.each do |target|
+    target.build_configurations.each do |config|
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '13.0'
     end
   end
 end
