@@ -1,46 +1,55 @@
-// ios/Runner/AppDelegate.swift
 import UIKit
 import Flutter
 
 @UIApplicationMain
 class AppDelegate: FlutterAppDelegate {
-  private let channelName = "com.varplayer.app/links"
-  private var initialLink: String?
+
+  private let channelName = "com.varplayerios/links"
+  private var methodChannel: FlutterMethodChannel?
+  private var pendingInitialLink: String?
 
   override func application(
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
 
-    // Flutter setup
-    let controller: FlutterViewController = window?.rootViewController as! FlutterViewController
-    let channel = FlutterMethodChannel(name: channelName, binaryMessenger: controller.binaryMessenger)
+    // Flutter
+    let controller : FlutterViewController = window?.rootViewController as! FlutterViewController
+    methodChannel = FlutterMethodChannel(name: channelName, binaryMessenger: controller.binaryMessenger)
 
-    channel.setMethodCallHandler { [weak self] call, result in
+    methodChannel?.setMethodCallHandler { [weak self] (call, result) in
       guard let self = self else { return }
       switch call.method {
       case "getInitialLink":
-        result(self.initialLink)
+        result(self.pendingInitialLink)
       case "clearInitialLink":
-        self.initialLink = nil
+        self.pendingInitialLink = nil
         result(nil)
       default:
         result(FlutterMethodNotImplemented)
       }
     }
 
+    // استلام رابط التشغيل عند الإقلاع (لو التطبيق مفتوح برابط)
+    if let url = launchOptions?[.url] as? URL {
+      self.pendingInitialLink = url.absoluteString
+    }
+
+    // iOS 13+ قد يستخدم SceneDelegate لفتح الروابط، بس نضمن الطريقتين
+    let res = super.application(application, didFinishLaunchingWithOptions: launchOptions)
     GeneratedPluginRegistrant.register(with: self)
-    return super.application(application, didFinishLaunchingWithOptions: launchOptions)
+    return res
   }
 
-  // varplayer://
-  override func application(_ app: UIApplication, open url: URL,
+  // iOS 9..12: openURL
+  override func application(_ app: UIApplication,
+                            open url: URL,
                             options: [UIApplication.OpenURLOptionsKey : Any] = [:]) -> Bool {
     handleIncoming(url: url)
     return true
   }
 
-  // Universal Links (إذا فعلتها لاحقًا)
+  // iOS 13+: scene delegate route — نضمن الإرسال للقناة أيضًا
   override func application(_ application: UIApplication, continue userActivity: NSUserActivity,
                             restorationHandler: @escaping ([UIUserActivityRestoring]?) -> Void) -> Bool {
     if userActivity.activityType == NSUserActivityTypeBrowsingWeb, let url = userActivity.webpageURL {
@@ -51,13 +60,12 @@ class AppDelegate: FlutterAppDelegate {
   }
 
   private func handleIncoming(url: URL) {
-    // خزّن أول رابط كـ initialLink
-    if initialLink == nil { initialLink = url.absoluteString }
-
-    // بثّه مباشرة لو التطبيق مفتوح
-    if let controller = window?.rootViewController as? FlutterViewController {
-      let channel = FlutterMethodChannel(name: channelName, binaryMessenger: controller.binaryMessenger)
-      channel.invokeMethod("onNewIntent", arguments: url.absoluteString)
+    let link = url.absoluteString
+    // إذا بعدنا ما سلّمنا initialLink للـ Dart:
+    if pendingInitialLink == nil {
+      pendingInitialLink = link
     }
+    // إذا Flutter شغّال، نبث onNewIntent
+    methodChannel?.invokeMethod("onNewIntent", arguments: link)
   }
 }
