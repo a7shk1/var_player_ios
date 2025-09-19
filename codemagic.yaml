@@ -23,11 +23,13 @@ workflows:
     scripts:
       - name: Flutter clean & pub get
         script: |
+          set -euxo pipefail
           flutter clean
           flutter pub get
 
       - name: (Optional) Override Bundle ID
         script: |
+          set -euxo pipefail
           if [ -n "$BUNDLE_ID" ]; then
             echo "Using BUNDLE_ID=$BUNDLE_ID"
             plutil -replace CFBundleIdentifier -string "$BUNDLE_ID" ios/Runner/Info.plist || true
@@ -36,27 +38,31 @@ workflows:
 
       - name: Pod install
         script: |
+          set -euxo pipefail
           cd ios
           pod repo update
           pod install
           cd ..
 
-      - name: Resolve FLUTTER_ROOT for Xcode scripts
+      - name: Resolve FLUTTER_ROOT for Xcode Run Script
         script: |
-          # يخلي سكربت xcode_backend.sh يشتغل بدون ما يفشل
+          set -euxo pipefail
           FLUTTER_ROOT="$(flutter sdk-path)"
           echo "FLUTTER_ROOT=$FLUTTER_ROOT"
+          # نوصل المتغير للخطوات التالية
           echo "FLUTTER_ROOT=$FLUTTER_ROOT" >> $CM_ENV
           echo "VERBOSE_SCRIPT_LOGGING=YES" >> $CM_ENV
 
-      - name: Xcode archive (NO codesign)
+      - name: Xcode archive (NO codesign, full logs)
         script: |
-          set -euo pipefail
+          set -euxo pipefail
           source $CM_ENV
 
+          # طباعة بعض الإعدادات
           xcodebuild -version
+          xcodebuild -workspace ios/Runner.xcworkspace -scheme "$SCHEME" -showBuildSettings | head -n 50 || true
 
-          # أرشِف بدون توقيع – مهم تعطيل كل شيء يخص الكودساين
+          # الأرشفة بدون توقيع وبكامل المتغيرات التي يحتاجها سكربت Flutter
           xcodebuild \
             -workspace ios/Runner.xcworkspace \
             -scheme "$SCHEME" \
@@ -72,47 +78,56 @@ workflows:
             PROVISIONING_PROFILE_SPECIFIER="" \
             OTHER_CODE_SIGN_FLAGS="--keychain /dev/null" \
             FLUTTER_ROOT="$FLUTTER_ROOT" \
-            VERBOSE_SCRIPT_LOGGING=YES | xcpretty
+            VERBOSE_SCRIPT_LOGGING=YES
 
-          echo "✅ Archive created at: $ARCHIVE_PATH"
-
-      - name: Extract Runner.app from archive
+      - name: Fallback: flutter build ios --no-codesign (if archive failed)
         script: |
-          set -euo pipefail
-          APP_SRC="$ARCHIVE_PATH/Products/Applications/Runner.app"
-          APP_DST="build/ios/iphoneos/Runner.app"
-
-          if [ ! -d "$APP_SRC" ]; then
-            echo "❌ Runner.app not found at $APP_SRC"
-            ls -lah "$ARCHIVE_PATH/Products/Applications" || true
-            exit 1
+          set -euxo pipefail
+          if [ ! -d "$ARCHIVE_PATH/Products/Applications/Runner.app" ]; then
+            echo "Archive not found; trying flutter build ios --no-codesign as fallback…"
+            # نخلي البناء يكمل حتى لو فلتر يرجّع non-zero (يتعثر بالتوقيع عادةً)
+            if ! flutter build ios --release --no-codesign; then
+              echo "flutter build ios returned non-zero (expected sometimes when signing is disabled)."
+            fi
+            if [ ! -d "build/ios/iphoneos/Runner.app" ]; then
+              echo "❌ Runner.app not produced by fallback."
+              exit 1
+            fi
           fi
 
-          rm -rf "$APP_DST"
-          mkdir -p "$(dirname "$APP_DST")"
-          cp -R "$APP_SRC" "$APP_DST"
-          echo "✅ Copied Runner.app to $APP_DST"
+      - name: Stage Runner.app
+        script: |
+          set -euxo pipefail
+          if [ -d "$ARCHIVE_PATH/Products/Applications/Runner.app" ]; then
+            mkdir -p build/ios/iphoneos
+            rm -rf build/ios/iphoneos/Runner.app
+            cp -R "$ARCHIVE_PATH/Products/Applications/Runner.app" build/ios/iphoneos/Runner.app
+            echo "✅ Copied Runner.app from archive."
+          else
+            echo "✅ Using Runner.app from flutter build output."
+          fi
 
       - name: Create unsigned IPA
         script: |
-          set -euo pipefail
+          set -euxo pipefail
           rm -rf Payload build/ios/ipa
           mkdir -p Payload build/ios/ipa
           cp -R build/ios/iphoneos/Runner.app Payload/Runner.app
           IPA_NAME="VarPlayer-unsigned-${CM_BUILD_ID}.ipa"
-          zip -qry "build/ios/ipa/$IPA_NAME" Payload
+          (cd Payload && zip -qry "../build/ios/ipa/$IPA_NAME" .)
           echo "✅ Unsigned IPA: build/ios/ipa/$IPA_NAME"
 
       - name: Sanity print artifacts
         script: |
+          set -euxo pipefail
           echo "==> build/ios/iphoneos:"
           ls -lah build/ios/iphoneos || true
           echo "==> build/ios/ipa:"
           ls -lah build/ios/ipa || true
 
     artifacts:
-      - build/ios/ipa/*.ipa            # IPA غير موقّع (لـ Sideloadly)
-      - build/ios/iphoneos/Runner.app  # تطبيق Runner.app جاهز
+      - build/ios/ipa/*.ipa            # IPA غير موقّع (لسيدلودلي)
+      - build/ios/iphoneos/Runner.app  # Runner.app
 
     publishing:
       email:
