@@ -9,8 +9,11 @@ workflows:
       xcode: latest
       cocoapods: default
       vars:
-        # غيّرها إذا تحب تثبّت Bundle ID أثناء البناء (اختياري)
+        # اختياري: غيّر الـ Bundle ID وقت البناء
         BUNDLE_ID: com.varplayerios.varplayer
+        SCHEME: Runner
+        CONFIGURATION: Release
+        ARCHIVE_PATH: build/ios/archive/Runner.xcarchive
 
     cache:
       cache_paths:
@@ -39,27 +42,60 @@ workflows:
           pod install
           cd ..
 
-      - name: Build iOS (Release, NO codesign)
+      # مهم: نستخدم xcodebuild مباشرة مع تعطيل التوقيع تمامًا
+      - name: Xcode archive (NO codesign)
         script: |
           set -euo pipefail
-          flutter build ios --release --no-codesign
-          APP_PATH="build/ios/iphoneos/Runner.app"
-          if [ ! -d "$APP_PATH" ]; then
-            echo "❌ Runner.app not found at $APP_PATH"
+
+          # تأكد من وجود الـ workspace
+          if [ ! -d "ios" ]; then
+            echo "❌ ios folder not found"; exit 1
+          fi
+
+          xcodebuild -version
+
+          # أرشِف بصلاحيات توقيع مُعطّلة
+          xcodebuild \
+            -workspace ios/Runner.xcworkspace \
+            -scheme "$SCHEME" \
+            -configuration "$CONFIGURATION" \
+            -sdk iphoneos \
+            -destination "generic/platform=iOS" \
+            archive \
+            -archivePath "$ARCHIVE_PATH" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_IDENTITY="" \
+            DEVELOPMENT_TEAM="" \
+            PROVISIONING_PROFILE_SPECIFIER="" | xcpretty
+
+          echo "✅ Archive created at: $ARCHIVE_PATH"
+
+      - name: Extract Runner.app from archive
+        script: |
+          set -euo pipefail
+          APP_SRC="$ARCHIVE_PATH/Products/Applications/Runner.app"
+          APP_DST="build/ios/iphoneos/Runner.app"
+
+          if [ ! -d "$APP_SRC" ]; then
+            echo "❌ Runner.app not found at $APP_SRC"
+            ls -lah "$ARCHIVE_PATH/Products/Applications" || true
             exit 1
           fi
-          echo "✅ Runner.app found."
+
+          rm -rf "$APP_DST"
+          mkdir -p "$(dirname "$APP_DST")"
+          cp -R "$APP_SRC" "$APP_DST"
+          echo "✅ Copied Runner.app to $APP_DST"
 
       - name: Create unsigned IPA
         script: |
           set -euo pipefail
-          rm -rf Payload *.ipa
-          mkdir -p Payload
+          rm -rf Payload build/ios/ipa
+          mkdir -p Payload build/ios/ipa
           cp -R build/ios/iphoneos/Runner.app Payload/Runner.app
           IPA_NAME="VarPlayer-unsigned-${CM_BUILD_ID}.ipa"
-          zip -qry "$IPA_NAME" Payload
-          mkdir -p build/ios/ipa
-          mv "$IPA_NAME" build/ios/ipa/
+          zip -qry "build/ios/ipa/$IPA_NAME" Payload
           echo "✅ Unsigned IPA: build/ios/ipa/$IPA_NAME"
 
       - name: Sanity print artifacts
@@ -70,8 +106,8 @@ workflows:
           ls -lah build/ios/ipa || true
 
     artifacts:
-      - build/ios/ipa/*.ipa         # الـ IPA غير الموقّع (جاهز لـ Sideloadly)
-      - build/ios/iphoneos/Runner.app  # تطبيق Runner.app نفسه
+      - build/ios/ipa/*.ipa            # IPA غير موقّع (لـ Sideloadly)
+      - build/ios/iphoneos/Runner.app  # تطبيق Runner.app جاهز
 
     publishing:
       email:
