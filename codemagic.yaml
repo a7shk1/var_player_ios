@@ -49,7 +49,7 @@ workflows:
           set -euxo pipefail
           FLUTTER_ROOT="$(flutter sdk-path)"
           echo "FLUTTER_ROOT=$FLUTTER_ROOT"
-          # نوصل المتغير للخطوات التالية
+          # نمرّر المتغير لخطوات لاحقة
           echo "FLUTTER_ROOT=$FLUTTER_ROOT" >> $CM_ENV
           echo "VERBOSE_SCRIPT_LOGGING=YES" >> $CM_ENV
 
@@ -58,11 +58,9 @@ workflows:
           set -euxo pipefail
           source $CM_ENV
 
-          # طباعة بعض الإعدادات
           xcodebuild -version
           xcodebuild -workspace ios/Runner.xcworkspace -scheme "$SCHEME" -showBuildSettings | head -n 50 || true
 
-          # الأرشفة بدون توقيع وبكامل المتغيرات التي يحتاجها سكربت Flutter
           xcodebuild \
             -workspace ios/Runner.xcworkspace \
             -scheme "$SCHEME" \
@@ -80,12 +78,11 @@ workflows:
             FLUTTER_ROOT="$FLUTTER_ROOT" \
             VERBOSE_SCRIPT_LOGGING=YES
 
-      - name: Fallback: flutter build ios --no-codesign (if archive failed)
+      - name: Fallback - flutter build ios --no-codesign (if archive failed)
         script: |
           set -euxo pipefail
           if [ ! -d "$ARCHIVE_PATH/Products/Applications/Runner.app" ]; then
             echo "Archive not found; trying flutter build ios --no-codesign as fallback…"
-            # نخلي البناء يكمل حتى لو فلتر يرجّع non-zero (يتعثر بالتوقيع عادةً)
             if ! flutter build ios --release --no-codesign; then
               echo "flutter build ios returned non-zero (expected sometimes when signing is disabled)."
             fi
