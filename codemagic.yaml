@@ -1,24 +1,77 @@
 workflows:
   ios-release-player:
-    name: iOS Release Build - Player
+    name: iOS Unsigned Release - Player
     max_build_duration: 60
     instance_type: mac_mini_m2
 
     environment:
       flutter: stable
       xcode: latest
+      cocoapods: default
+      vars:
+        # غيّرها إذا تحب تثبّت Bundle ID أثناء البناء (اختياري)
+        BUNDLE_ID: com.varplayerios.varplayer
+
+    cache:
+      cache_paths:
+        - ~/.pub-cache
+        - ~/Library/Caches/CocoaPods
+        - ios/Pods
 
     scripts:
-      - name: Get Flutter packages
-        script: flutter pub get
+      - name: Flutter clean & pub get
+        script: |
+          flutter clean
+          flutter pub get
 
-      - name: Build iOS IPA
-        script: flutter build ipa --release --no-codesign
+      - name: (Optional) Override Bundle ID
+        script: |
+          if [ -n "$BUNDLE_ID" ]; then
+            echo "Using BUNDLE_ID=$BUNDLE_ID"
+            plutil -replace CFBundleIdentifier -string "$BUNDLE_ID" ios/Runner/Info.plist || true
+            /usr/libexec/PlistBuddy -c "Set :PRODUCT_BUNDLE_IDENTIFIER $BUNDLE_ID" ios/Runner.xcodeproj/project.pbxproj 2>/dev/null || true
+          fi
+
+      - name: Pod install
+        script: |
+          cd ios
+          pod repo update
+          pod install
+          cd ..
+
+      - name: Build iOS (Release, NO codesign)
+        script: |
+          set -euo pipefail
+          flutter build ios --release --no-codesign
+          APP_PATH="build/ios/iphoneos/Runner.app"
+          if [ ! -d "$APP_PATH" ]; then
+            echo "❌ Runner.app not found at $APP_PATH"
+            exit 1
+          fi
+          echo "✅ Runner.app found."
+
+      - name: Create unsigned IPA
+        script: |
+          set -euo pipefail
+          rm -rf Payload *.ipa
+          mkdir -p Payload
+          cp -R build/ios/iphoneos/Runner.app Payload/Runner.app
+          IPA_NAME="VarPlayer-unsigned-${CM_BUILD_ID}.ipa"
+          zip -qry "$IPA_NAME" Payload
+          mkdir -p build/ios/ipa
+          mv "$IPA_NAME" build/ios/ipa/
+          echo "✅ Unsigned IPA: build/ios/ipa/$IPA_NAME"
+
+      - name: Sanity print artifacts
+        script: |
+          echo "==> build/ios/iphoneos:"
+          ls -lah build/ios/iphoneos || true
+          echo "==> build/ios/ipa:"
+          ls -lah build/ios/ipa || true
 
     artifacts:
-      - build/ios/ipa/*.ipa
-      - build/ios/ipa/*.app
-      - build/ios/archive/*.xcarchive
+      - build/ios/ipa/*.ipa         # الـ IPA غير الموقّع (جاهز لـ Sideloadly)
+      - build/ios/iphoneos/Runner.app  # تطبيق Runner.app نفسه
 
     publishing:
       email:
