@@ -13,15 +13,15 @@ class AppDelegate: FlutterAppDelegate {
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
 
-    // سجّل إضافات Flutter
+    // سجل إضافات Flutter أولاً
     GeneratedPluginRegistrant.register(with: self)
 
-    // أمسك الـ controller بأمان
+    // أمسك الـ FlutterViewController بأمان
     guard let controller = window?.rootViewController as? FlutterViewController else {
       return super.application(application, didFinishLaunchingWithOptions: launchOptions)
     }
 
-    // MethodChannel
+    // قناة دارت <-> iOS
     methodChannel = FlutterMethodChannel(name: channelName, binaryMessenger: controller.binaryMessenger)
     methodChannel?.setMethodCallHandler { [weak self] (call, result) in
       guard let self = self else { return }
@@ -36,23 +36,24 @@ class AppDelegate: FlutterAppDelegate {
       }
     }
 
-    // رابط بدء التشغيل (إذا موجود)
+    // إذا التطبيق انفتح برابط
     if let url = launchOptions?[.url] as? URL {
       self.pendingInitialLink = url.absoluteString
     }
 
-    // لازم آخر سطر يرجع super
+    // لازم يرجع super
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
 
-  // iOS 9..12
-  override func application(_ app: UIApplication, open url: URL,
+  // iOS 9..12: فتح via URL scheme
+  override func application(_ app: UIApplication,
+                            open url: URL,
                             options: [UIApplication.OpenURLOptionsKey : Any] = [:]) -> Bool {
     handleIncoming(url: url)
     return true
   }
 
-  // Universal links (iOS 13+)
+  // iOS 13+ (Universal links)
   override func application(_ application: UIApplication,
                             continue userActivity: NSUserActivity,
                             restorationHandler: @escaping ([UIUserActivityRestoring]?) -> Void) -> Bool {
@@ -66,9 +67,7 @@ class AppDelegate: FlutterAppDelegate {
 
   private func handleIncoming(url: URL) {
     let link = url.absoluteString
-    if pendingInitialLink == nil {
-      pendingInitialLink = link
-    }
+    if pendingInitialLink == nil { pendingInitialLink = link }
     methodChannel?.invokeMethod("onNewIntent", arguments: link)
   }
 }
