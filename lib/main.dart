@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:developer' as dev;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
@@ -9,7 +10,22 @@ import 'package:video_player/video_player.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(const VarPlayerApp());
+
+  // لالتقاط أي أخطاء Flutter مبكّرة في اللوج
+  FlutterError.onError = (details) {
+    FlutterError.presentError(details);
+    dev.log(
+      'FlutterError: ${details.exceptionAsString()}\n${details.stack}',
+      name: 'VarPlayer',
+    );
+  };
+
+  // حبس أي استثناء غير مضبوط على مستوى الزون
+  runZonedGuarded(() {
+    runApp(const VarPlayerApp());
+  }, (error, stack) {
+    dev.log('ZonedError: $error\n$stack', name: 'VarPlayer');
+  });
 }
 
 class VarPlayerApp extends StatelessWidget {
@@ -55,13 +71,27 @@ class _PlayerScreenState extends State<PlayerScreen>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
 
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
-    SystemChrome.setPreferredOrientations(const [
-      DeviceOrientation.landscapeLeft,
-      DeviceOrientation.landscapeRight,
-    ]);
+    // نخلي تغييرات الـ UI بعد أول فريم لتفادي مشاكل iOS
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+      SystemChrome.setPreferredOrientations(const [
+        DeviceOrientation.landscapeLeft,
+        DeviceOrientation.landscapeRight,
+      ]);
 
-    _initLinks();
+      _initLinksSafe();
+      // للاختبار فقط (احذفها بعد التأكد):
+      // _handleIncomingLink('https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8');
+    });
+  }
+
+  Future<void> _initLinksSafe() async {
+    try {
+      await _initLinks();
+    } catch (e, st) {
+      dev.log('initLinks crashed: $e\n$st', name: 'VarPlayer');
+      if (mounted) setState(() => _status = 'Init links failed');
+    }
   }
 
   @override
@@ -80,16 +110,21 @@ class _PlayerScreenState extends State<PlayerScreen>
           await _channel.invokeMethod('clearInitialLink');
         } catch (_) {}
       }
-    } catch (e) {
-      dev.log('getInitialLink error: $e', name: 'VarPlayer');
+    } catch (e, st) {
+      dev.log('getInitialLink error: $e\n$st', name: 'VarPlayer');
     }
 
+    // استقبال الروابط أثناء التشغيل
     _channel.setMethodCallHandler((call) async {
-      if (call.method == 'onNewIntent') {
-        final link = call.arguments as String?;
-        if (link != null && link.isNotEmpty) {
-          _handleIncomingLink(link);
+      try {
+        if (call.method == 'onNewIntent') {
+          final link = call.arguments as String?;
+          if (link != null && link.isNotEmpty) {
+            _handleIncomingLink(link);
+          }
         }
+      } catch (e, st) {
+        dev.log('onNewIntent handler error: $e\n$st', name: 'VarPlayer');
       }
       return null;
     });
@@ -167,7 +202,7 @@ class _PlayerScreenState extends State<PlayerScreen>
     final referer = uri != null ? '${uri.scheme}://${uri.host}/' : null;
     return {
       'User-Agent':
-      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36',
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36',
       'Accept': '*/*',
       'Accept-Language': 'en-US,en;q=0.9,ar;q=0.8',
       'Connection': 'keep-alive',
@@ -242,14 +277,14 @@ class _PlayerScreenState extends State<PlayerScreen>
         _status = 'Loading...';
       });
       await _openSafe(res.url, res.headers);
-    } catch (e) {
-      dev.log('resolve failed: $e', name: 'VarPlayer');
+    } catch (e, st) {
+      dev.log('resolve failed: $e\n$st', name: 'VarPlayer');
       setState(() => _status = 'Resolve failed. Retrying...');
       _scheduleRetry(url, _epoch, headers, forceResolve: true);
     }
   }
 
-  // Raw-triple-quoted regex لتفادي مشاكل الاقتباسات
+  // Raw-triple-quoted regex
   static final RegExp _absM3u8 = RegExp(
     r'''https?:\/\/[^\s"'<>]+\.m3u8[^\s"'<>]*''',
     caseSensitive: false,
@@ -276,7 +311,7 @@ class _PlayerScreenState extends State<PlayerScreen>
     // 1) HEAD
     try {
       final head =
-      await client.head(start, headers: headers).timeout(const Duration(seconds: 8));
+          await client.head(start, headers: headers).timeout(const Duration(seconds: 8));
       _mergeSetCookieInto(headers, head.headers);
       final reqUrl = head.request?.url ?? start;
       final ct = head.headers['content-type'] ?? '';
@@ -288,7 +323,7 @@ class _PlayerScreenState extends State<PlayerScreen>
 
     // 2) GET
     final resp =
-    await client.get(start, headers: headers).timeout(const Duration(seconds: 12));
+        await client.get(start, headers: headers).timeout(const Duration(seconds: 12));
     _mergeSetCookieInto(headers, resp.headers);
     final finalUrl = resp.request?.url ?? start;
     final ct2 = resp.headers['content-type'] ?? '';
@@ -374,7 +409,7 @@ class _PlayerScreenState extends State<PlayerScreen>
     final ctrl = VideoPlayerController.networkUrl(
       Uri.parse(url),
       httpHeaders: headers,
-      videoPlayerOptions: VideoPlayerOptions(
+      videoPlayerOptions: const VideoPlayerOptions(
         mixWithOthers: true,
         allowBackgroundPlayback: false,
       ),
@@ -401,7 +436,8 @@ class _PlayerScreenState extends State<PlayerScreen>
 
       setState(() => _status = 'Playing');
       _kickAutoHide();
-    } catch (e) {
+    } catch (e, st) {
+      dev.log('initialize failed: $e\n$st', name: 'VarPlayer');
       if (mounted && myEpoch == _epoch) {
         setState(() => _status = 'Init failed. Retrying...');
         _scheduleRetry(url, myEpoch, headers);
@@ -500,20 +536,20 @@ class _PlayerScreenState extends State<PlayerScreen>
               child: Center(
                 child: (initialized && _ctrl != null)
                     ? FittedBox(
-                  fit: _fitCover ? BoxFit.cover : BoxFit.contain,
-                  child: SizedBox(
-                    width: 1280,
-                    height: 720,
-                    child: AspectRatio(
-                      aspectRatio: aspect,
-                      child: VideoPlayer(_ctrl!),
-                    ),
-                  ),
-                )
+                        fit: _fitCover ? BoxFit.cover : BoxFit.contain,
+                        child: SizedBox(
+                          width: 1280,
+                          height: 720,
+                          child: AspectRatio(
+                            aspectRatio: aspect,
+                            child: VideoPlayer(_ctrl!),
+                          ),
+                        ),
+                      )
                     : Text(
-                  _status,
-                  style: const TextStyle(color: Colors.white70),
-                ),
+                        _status,
+                        style: const TextStyle(color: Colors.white70),
+                      ),
               ),
             ),
 
@@ -596,9 +632,9 @@ class _PlayerScreenState extends State<PlayerScreen>
                             onPressed: _currentUrl == null
                                 ? null
                                 : () => _openResolved(
-                              _currentUrl!,
-                              _currentHeaders,
-                            ),
+                                      _currentUrl!,
+                                      _currentHeaders,
+                                    ),
                             icon: const Icon(Icons.refresh),
                           ),
                         ],
@@ -679,7 +715,7 @@ class _Resolved {
   _Resolved(this.url, this.headers);
 }
 
-/// Progress + buffered (VOD) — بسيط وآمن
+/// Progress + buffered (VOD)
 class _BufferedBar extends StatelessWidget {
   final Duration duration;
   final Duration position;
