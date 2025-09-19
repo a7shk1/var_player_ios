@@ -2,7 +2,6 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <!-- الأساسيات -->
   <key>CFBundleDevelopmentRegion</key>
   <string>en</string>
   <key>CFBundleDisplayName</key>
@@ -10,7 +9,7 @@
   <key>CFBundleExecutable</key>
   <string>$(EXECUTABLE_NAME)</string>
   <key>CFBundleIdentifier</key>
-  <string>com.yourcompany.varplayer</string>
+  <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
   <key>CFBundleInfoDictionaryVersion</key>
   <string>6.0</string>
   <key>CFBundleName</key>
@@ -24,7 +23,6 @@
   <key>LSRequiresIPhoneOS</key>
   <true/>
 
-  <!-- اتجاه العرض: التطبيق عندك Landscape -->
   <key>UISupportedInterfaceOrientations</key>
   <array>
     <string>UIInterfaceOrientationLandscapeLeft</string>
@@ -36,22 +34,20 @@
     <string>UIInterfaceOrientationLandscapeRight</string>
   </array>
 
-  <!-- وضع الغامق/الفاتح: خلّيه يدعم الاثنين -->
   <key>UIUserInterfaceStyle</key>
   <string>Automatic</string>
 
-  <!-- Flutter -->
   <key>io.flutter.embedded_views_preview</key>
   <true/>
   <key>UILaunchStoryboardName</key>
   <string>LaunchScreen</string>
 
-  <!-- استقبال الروابط العميقة: varplayer://play?t=... -->
+  <!-- URL scheme varplayer:// -->
   <key>CFBundleURLTypes</key>
   <array>
     <dict>
       <key>CFBundleURLName</key>
-      <string>com.yourcompany.varplayer</string>
+      <string>varplayer</string>
       <key>CFBundleURLSchemes</key>
       <array>
         <string>varplayer</string>
@@ -59,7 +55,6 @@
     </dict>
   </array>
 
-  <!-- السماح بقراءة مخططات مخصّصة لو احتجتها -->
   <key>LSApplicationQueriesSchemes</key>
   <array>
     <string>varplayer</string>
@@ -67,14 +62,12 @@
     <string>https</string>
   </array>
 
-  <!-- ATS: إذا عندك ستريمات http (بدون https) -->
   <key>NSAppTransportSecurity</key>
   <dict>
     <key>NSAllowsArbitraryLoads</key>
     <true/>
   </dict>
 
-  <!-- صلاحيات صوت/فيديو (عادةً مو ضرورية للفيديو أونلاين، بس ما تضر) -->
   <key>NSMicrophoneUsageDescription</key>
   <string>App needs access to microphone for video playback features.</string>
   <key>NSCameraUsageDescription</key>
