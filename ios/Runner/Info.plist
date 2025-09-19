@@ -2,52 +2,29 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+  <!-- الأساسيات -->
   <key>CFBundleDevelopmentRegion</key>
-  <string>$(DEVELOPMENT_LANGUAGE)</string>
-
+  <string>en</string>
   <key>CFBundleDisplayName</key>
-  <string>Var Player iOS</string>
-
+  <string>VarPlayer</string>
   <key>CFBundleExecutable</key>
   <string>$(EXECUTABLE_NAME)</string>
-
   <key>CFBundleIdentifier</key>
-  <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
-
+  <string>com.yourcompany.varplayer</string>
   <key>CFBundleInfoDictionaryVersion</key>
   <string>6.0</string>
-
   <key>CFBundleName</key>
-  <string>var_player_ios</string>
-
+  <string>VarPlayer</string>
   <key>CFBundlePackageType</key>
   <string>APPL</string>
-
   <key>CFBundleShortVersionString</key>
-  <string>$(FLUTTER_BUILD_NAME)</string>
-
+  <string>1.0.0</string>
   <key>CFBundleVersion</key>
-  <string>$(FLUTTER_BUILD_NUMBER)</string>
-
+  <string>1</string>
   <key>LSRequiresIPhoneOS</key>
   <true/>
 
-  <!-- شاشة الإقلاع الخاصة بـ Flutter -->
-  <key>UILaunchStoryboardName</key>
-  <string>LaunchScreen</string>
-
-  <!-- لا نستخدم Main.storyboard مع Flutter -->
-  <!-- (حُذفت UIMainStoryboardFile) -->
-
-  <!-- الحالة (مثل قالب Flutter) -->
-  <key>UIViewControllerBasedStatusBarAppearance</key>
-  <false/>
-
-  <!-- إدخال غير مباشر (قالب Flutter) -->
-  <key>UIApplicationSupportsIndirectInputEvents</key>
-  <true/>
-
-  <!-- الإتجاهات: Landscape فقط على iPhone و iPad -->
+  <!-- اتجاه العرض: التطبيق عندك Landscape -->
   <key>UISupportedInterfaceOrientations</key>
   <array>
     <string>UIInterfaceOrientationLandscapeLeft</string>
@@ -59,34 +36,48 @@
     <string>UIInterfaceOrientationLandscapeRight</string>
   </array>
 
-  <!-- ملء الشاشة على iPhone (اختياري لكنه مناسب للفيديو) -->
-  <key>UIRequiresFullScreen</key>
-  <true/>
+  <!-- وضع الغامق/الفاتح: خلّيه يدعم الاثنين -->
+  <key>UIUserInterfaceStyle</key>
+  <string>Automatic</string>
 
-  <!-- تحسين الأداء على iPhone (قالب Flutter جديد) -->
-  <key>CADisableMinimumFrameDurationOnPhone</key>
+  <!-- Flutter -->
+  <key>io.flutter.embedded_views_preview</key>
   <true/>
+  <key>UILaunchStoryboardName</key>
+  <string>LaunchScreen</string>
 
-  <!-- URL Schemes لاستقبال varplayer:// -->
+  <!-- استقبال الروابط العميقة: varplayer://play?t=... -->
   <key>CFBundleURLTypes</key>
   <array>
     <dict>
       <key>CFBundleURLName</key>
-      <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+      <string>com.yourcompany.varplayer</string>
       <key>CFBundleURLSchemes</key>
       <array>
         <string>varplayer</string>
       </array>
-      <key>CFBundleTypeRole</key>
-      <string>Editor</string>
     </dict>
   </array>
 
-  <!-- (اختياري للتطوير) السماح بروابط HTTP غير آمنة -->
+  <!-- السماح بقراءة مخططات مخصّصة لو احتجتها -->
+  <key>LSApplicationQueriesSchemes</key>
+  <array>
+    <string>varplayer</string>
+    <string>http</string>
+    <string>https</string>
+  </array>
+
+  <!-- ATS: إذا عندك ستريمات http (بدون https) -->
   <key>NSAppTransportSecurity</key>
   <dict>
     <key>NSAllowsArbitraryLoads</key>
     <true/>
   </dict>
+
+  <!-- صلاحيات صوت/فيديو (عادةً مو ضرورية للفيديو أونلاين، بس ما تضر) -->
+  <key>NSMicrophoneUsageDescription</key>
+  <string>App needs access to microphone for video playback features.</string>
+  <key>NSCameraUsageDescription</key>
+  <string>App may access camera for future features.</string>
 </dict>
 </plist>
