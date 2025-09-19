@@ -9,7 +9,6 @@ workflows:
       xcode: latest
       cocoapods: default
       vars:
-        # اختياري: غيّر الـ Bundle ID وقت البناء
         BUNDLE_ID: com.varplayerios.varplayer
         SCHEME: Runner
         CONFIGURATION: Release
@@ -42,19 +41,22 @@ workflows:
           pod install
           cd ..
 
-      # مهم: نستخدم xcodebuild مباشرة مع تعطيل التوقيع تمامًا
+      - name: Resolve FLUTTER_ROOT for Xcode scripts
+        script: |
+          # يخلي سكربت xcode_backend.sh يشتغل بدون ما يفشل
+          FLUTTER_ROOT="$(flutter sdk-path)"
+          echo "FLUTTER_ROOT=$FLUTTER_ROOT"
+          echo "FLUTTER_ROOT=$FLUTTER_ROOT" >> $CM_ENV
+          echo "VERBOSE_SCRIPT_LOGGING=YES" >> $CM_ENV
+
       - name: Xcode archive (NO codesign)
         script: |
           set -euo pipefail
-
-          # تأكد من وجود الـ workspace
-          if [ ! -d "ios" ]; then
-            echo "❌ ios folder not found"; exit 1
-          fi
+          source $CM_ENV
 
           xcodebuild -version
 
-          # أرشِف بصلاحيات توقيع مُعطّلة
+          # أرشِف بدون توقيع – مهم تعطيل كل شيء يخص الكودساين
           xcodebuild \
             -workspace ios/Runner.xcworkspace \
             -scheme "$SCHEME" \
@@ -67,7 +69,10 @@ workflows:
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_IDENTITY="" \
             DEVELOPMENT_TEAM="" \
-            PROVISIONING_PROFILE_SPECIFIER="" | xcpretty
+            PROVISIONING_PROFILE_SPECIFIER="" \
+            OTHER_CODE_SIGN_FLAGS="--keychain /dev/null" \
+            FLUTTER_ROOT="$FLUTTER_ROOT" \
+            VERBOSE_SCRIPT_LOGGING=YES | xcpretty
 
           echo "✅ Archive created at: $ARCHIVE_PATH"
 
